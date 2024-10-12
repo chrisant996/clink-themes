@@ -1,0 +1,52 @@
+-- This is an example to show how to make a clinkprompt file for a customized
+-- flexprompt configuration.
+
+-- Get flexprompt from here:  https://github.com/chrisant996/clink-flex-prompt
+
+-- luacheck: globals flexprompt
+if not flexprompt then
+    error("flexprompt is not loaded")
+end
+
+local old_settings
+
+local function onactivate()
+    -- Save the flexprompt settings to avoid destroying them.
+    old_settings = flexprompt.settings
+
+    -- Create new flexprompt settings with your customizations.
+    local s = {}
+    s.style = "classic"
+    s.frame_color = "dark"
+    s.heads = "blurred"
+    s.separators = "bar"
+    s.left_prompt = "{battery}{cwd}{scm}"
+    s.right_prompt = "{duration}{time}"
+    flexprompt.settings = s
+
+    -- Copy the previous symbols table for best results.
+    s.symbols = old_settings.symbols
+end
+
+local function ondeactivate()
+    -- Restore the saved flexprompt settings when this prompt is deactivated.
+    flexprompt.settings = old_settings
+end
+
+-- Return an exports table.
+local exports =
+{
+    -- The onactivate function gets called when you use `clink config prompt
+    -- use flexample` to activate this prompt.
+    onactivate = onactivate,
+
+    -- The ondeactivate function gets called when you activate a different
+    -- prompt, or why you deactivate this prompt with `clink config prompt
+    -- clear`.
+    ondeactivate = ondeactivate,
+
+    -- The dependson field lists other prompts that this one needs loaded and
+    -- activated in order for it to work.
+    dependson = "flexprompt",
+}
+return exports

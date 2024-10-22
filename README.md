@@ -32,11 +32,11 @@ Or you may need to also configure the custom prompt to turn on (or off) its feat
 
 ### Color Themes
 
-Visit [here](https://github.com/chrisant996/clink-themes/themes/COLORTHEMES.md) for a list of color themes in this repo.
+Visit [here](/themes/COLORTHEMES.md) for a list of color themes in this repo.
 
 ### Custom Prompts
 
-Visit [here](https://github.com/chrisant996/clink-themes/themes/CUSTOMPROMPTS.md) for a list of custom prompts in this repo.
+Visit [here](/themes/CUSTOMPROMPTS.md) for a list of custom prompts in this repo.
 
 ### More Information
 
@@ -51,7 +51,7 @@ Do you have a color theme or custom prompt you want to share here?
 3. Add your file(s) in the topic branch.
    - In comments at the top of the .clinktheme or .clinkprompt file(s), note the license for the theme or prompt, if applicable.
    - Optionally include a screen shot of the theme (recommended).
-   - Add a section in the [COLORTHEMES.md](https://github.com/chrisant996/clink-themes/themes/COLORTHEMES.md) or [CUSTOMPROMPTS.md](https://github.com/chrisant996/clink-themes/themes/CUSTOMPROMPTS.md) file for your color theme or custom prompt.
+   - Add a section in the [COLORTHEMES.md](/themes/COLORTHEMES.md) or [CUSTOMPROMPTS.md](/themes/CUSTOMPROMPTS.md) file for your color theme or custom prompt.
 4. Push your changes to GitHub.
 5. Create a Pull Request from your topic branch to the main clink-themes repo.
 

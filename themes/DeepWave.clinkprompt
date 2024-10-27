@@ -1,0 +1,818 @@
+--------------------------------------------------------------------------------
+-- DeepWave clinkprompt Module
+-- MIT License https://choosealicense.com/licenses/mit/ (Feel free to share and adapt, but please attribute ^_^)
+-- Copyright (c) 2024 Patrick Khoo | https://github.com/starfishpatkhoo/ | http://deepwave.net
+
+-- Instructions, Source, Screenshots, etc: https://github.com/starfishpatkhoo/deepwave-clinkprompt/
+
+-- Set the following Environment Variables to configure these features:
+-- set DEEPWAVE_PROMPT_DISABLE_TIMESTAMP=1          Hide (Right) Timestamp
+-- set DEEPWAVE_PROMPT_DISABLE_HOSTNAME=1           Hide (Left) Computer Name
+-- set DEEPWAVE_PROMPT_DISABLE_ERRORIND=1           Hide Error Indicator
+-- set DEEPWAVE_PROMPT_DISABLE_BATTERYIND=1         Hide Battery Indicator
+-- set DEEPWAVE_PROMPT_DISABLE_DRVTYPEIND=1         Hide Drive Type Indicator
+-- set DEEPWAVE_PROMPT_DISABLE_MUTEOLD=1            Disable Mute Old Prompts
+-- set DEEPWAVE_PROMPT_ENABLE_TWOLINE=1             Enable Two-line Prompt
+-- set DEEPWAVE_PROMPT_THEME=theme_name             Set a Theme - blue, magenta, yellow, mono, blue_nb, magenta_nb, yellow_nb, mono_nb
+-- set DEEPWAVE_PROMPT_DISABLE_GREETING=1           Hide Greeting
+-- set DEEPWAVE_PROMPT_COLOUR_MODE=mode_name        Set a Colour Mode - dw, cga, td, org
+-- Reminder: 'clink set prompt.transient always|same_dir' is required for Mute Old / Two-Line Prompts
+-- Reminder: Fonts with borader character support might be needed for Battery / Drive Type Indicators
+
+local MOD_NAME = 'DeepWave'
+local MOD_VER = '1.1-20241027'
+local MOD_URL = 'https://github.com/starfishpatkhoo/deepwave-clinkprompt/'
+
+--------------------------------------------------------------------------------
+-- Define our Colours and Themes
+
+-- Colours in 16 (DeepWave), 16 (Forced Original CGA), 8 (CGA) and 4 (CGA) -bit (and 4-bit background): https://en.wikipedia.org/wiki/ANSI_escape_code#SGR
+-- 16-bit is "true colour", 8-bit is VGA, 4-bit is CGA
+-- We don't really use the 4-bit versions, but they're kept here for historical purposes
+local col_black = {      [17] = "#1d2229",  [16] = "#000000",  [8] = 0,    [4] = 30 }   -- [4_bg] = 40
+local col_red = {        [17] = "#dd4242",  [16] = "#aa0000",  [8] = 1,    [4] = 31 }   -- [4_bg] = 41
+local col_green = {      [17] = "#85c258",  [16] = "#00aa00",  [8] = 2,    [4] = 32 }   -- [4_bg] = 42
+local col_yellow = {     [17] = "#c89544",  [16] = "#aa5500",  [8] = 3,    [4] = 33 }   -- [4_bg] = 43
+local col_blue = {       [17] = "#01549e",  [16] = "#0000aa",  [8] = 4,    [4] = 34 }   -- [4_bg] = 44
+local col_magenta = {    [17] = "#9469e1",  [16] = "#aa00aa",  [8] = 5,    [4] = 35 }   -- [4_bg] = 45
+local col_cyan = {       [17] = "#48bbd1",  [16] = "#00aaaa",  [8] = 6,    [4] = 36 }   -- [4_bg] = 46
+local col_white = {      [17] = "#cccccc",  [16] = "#aaaaaa",  [8] = 7,    [4] = 37 }   -- [4_bg] = 47
+local col_brblack = {    [17] = "#888888",  [16] = "#555555",  [8] = 8,    [4] = 90 }   -- [4_bg] = 100
+local col_brred = {      [17] = "#fb6060",  [16] = "#ff5555",  [8] = 9,    [4] = 91 }   -- [4_bg] = 101
+local col_brgreen = {    [17] = "#a3e076",  [16] = "#55ff55",  [8] = 10,   [4] = 92 }   -- [4_bg] = 102
+local col_bryellow = {   [17] = "#e6b362",  [16] = "#ffff55",  [8] = 11,   [4] = 93 }   -- [4_bg] = 103
+local col_brblue = {     [17] = "#0383f5",  [16] = "#5555ff",  [8] = 12,   [4] = 94 }   -- [4_bg] = 104
+local col_brmagenta = {  [17] = "#b287ff",  [16] = "#ff55ff",  [8] = 13,   [4] = 95 }   -- [4_bg] = 105
+local col_brcyan = {     [17] = "#66d9ef",  [16] = "#55ffff",  [8] = 14,   [4] = 96 }   -- [4_bg] = 106
+local col_brwhite = {    [17] = "#f8f8f0",  [16] = "#ffffff",  [8] = 15,   [4] = 97 }   -- [4_bg] = 107
+local col_dkmagenta = {  [17] = "#8733ff",  [16] = "#8733ff",  [8] = 93,   [4] = col_magenta[4] }
+local col_dkyellow = {   [17] = "#9d631e",  [16] = "#9d631e",  [8] = 130,  [4] = col_yellow[4] }
+
+-- Theme Definitions
+local theme_defns = {
+	-- Blue Theme
+	["blue"] = {
+		cwd_fg = col_brwhite,          cwd_bg = col_brblue,
+		host_fg = col_brblack,         host_bg = col_blue,
+		timestamp_fg = col_brblue,
+	},
+
+	-- Blue Theme (No Background)
+	["blue_nb"] = {
+		cwd_fg = col_brcyan,           cwd_bg = false,
+		host_fg = col_brblue,          host_bg = false,
+		timestamp_fg = col_brblue,
+	},
+	
+	-- Magenta Theme
+	["magenta"] = {
+		cwd_fg = col_brwhite,          cwd_bg = col_dkmagenta,
+		host_fg = col_blue,            host_bg = col_brmagenta,
+		timestamp_fg = col_magenta,
+	},
+
+	-- Magenta Theme (No Background)
+	["magenta_nb"] = {
+		cwd_fg = col_brmagenta,        cwd_bg = false,
+		host_fg = col_magenta,         host_bg = false,
+		timestamp_fg = col_magenta,
+	},
+	
+	-- Yellow Theme
+	["yellow"] = {
+		cwd_fg = col_brwhite,          cwd_bg = col_dkyellow,
+		host_fg = col_blue,            host_bg = col_yellow,
+		timestamp_fg = col_yellow,
+	},
+
+	-- Yellow Theme (No Background)
+	["yellow_nb"] = {
+		cwd_fg = col_yellow,           cwd_bg = false,
+		host_fg = col_dkyellow,        host_bg = false,
+		timestamp_fg = col_yellow,
+	},
+
+	-- Monochrome Theme
+	["mono"] = {
+		cwd_fg = col_black,            cwd_bg = col_white,
+		host_fg = col_white,           host_bg = col_brblack,
+		timestamp_fg = col_white,
+	},
+
+	-- Monochrome Theme (No Background)
+	["mono_nb"] = {
+		cwd_fg = col_brwhite,          cwd_bg = false,
+		host_fg = col_brblack,         host_bg = false,
+		timestamp_fg = col_white,
+	},
+}
+
+--------------------------------------------------------------------------------
+-- Internal Data From here Onwards - Do Not Modify
+
+-- Default Settings (Change these through environment variables instead editing this file)
+local def_theme_name = "magenta"
+local def_enable_hostname = true
+local def_enable_timestamp = true
+local def_enable_errorind = true
+local def_enable_batteryind = true
+local def_enable_drvtypeind = true
+local def_enable_muteold = true
+local def_enable_twoline = false
+local def_enable_greeting = true
+local def_colour_mode = 17
+
+-- Special Colours
+local col_muted =     { cwd_fg = col_black,  cwd_bg = col_brblack,  host_fg = col_brblack,  host_bg = col_black }
+local col_muted_nb =  { cwd_fg = col_white,  cwd_bg = nil,          host_fg = col_brblack,  host_bg = nil }
+local col_line2 =     { fg = col_brwhite,    muted_fg = col_brblack }
+local col_error =     { fg = col_brwhite, bg = col_red }
+local col_state =     { fg = false, bg = false }
+local col_modes =     { ["dw"] = 17, ["cga"] = 16, ["td"] = 8, ["org"] = 4 }
+
+-- Constants, Special Codes, Unicode Numbers and Internal Variables
+local sgr_esc = "\x1b["
+local const_sep_hvbg = 0xe0b0
+local const_sep_nobg = 0x00bb
+local const_char_okyes = 0x2713
+local const_char_errno = 0x2717
+-- local const_char_acpower = 0x26a1 -- This symbol takes 2 console chars and screws up console line length calculations
+local const_char_acpower = 0x25c9
+local const_char_network = 0x221e
+local const_char_removable = 0x2359
+
+local power_list = {
+	[5] = { char = const_char_errno, fg = "#fb6060" },
+	[25] = { char = 0x2582, fg = "#fb6060" },  -- 0.25
+	[37] = { char = 0x2583, fg = "#df6a24" },  -- 0.375
+	[50] = { char = 0x2584, fg = "#e48e2f" },  -- 0.5
+	[62] = { char = 0x2585, fg = "#f3d946" },  -- 0.625
+	[75] = { char = 0x2586, fg = "#d5d845" },  -- 0.75
+	[87] = { char = 0x2587, fg = "#a3e076" },  -- 0.875
+	[100] = { char = 0x2588, fg = "#a1d642" },  -- 1.0
+	["AC"] = { char = const_char_acpower, fg = "#a1d642" },
+}
+
+local drive_list = {
+	unknown = const_char_errno,
+--	invalid = ,
+	removable = const_char_removable,
+--	fixed = ,
+--	ramdisk = ,
+	remote = const_char_network
+}
+
+local dw = { }
+
+--------------------------------------------------------------------------------
+-- Support Functions
+
+-- From agnoster.clinkprompt
+local function add_shift_and(x, y, s, a)
+    return x + bit32.band(bit32.rshift(y, s), a)
+end
+local function ucs2to8(c)
+    if ("number" ~= type(c)) then error(string.format("arg #1 unexpected type %s; expected number", type(c)))
+    elseif c < 0 then error(string.format("arg #1 cannot be negative"))
+    elseif c <= 0x007f then return string.char(c)
+    elseif c <= 0x07ff then return string.char(add_shift_and(0xc0, c, 6, 0x1f), add_shift_and(0x80, c, 0, 0x3f))
+    elseif c <= 0xffff then return string.char(add_shift_and(0xe0, c, 12, 0x0f), add_shift_and(0x80, c, 6, 0x3f), add_shift_and(0x80, c, 0, 0x3f))
+    else error(string.format("arg #1 value 0x%x exceeds 0xffff", c))
+    end
+end
+local function hex2dec(hex, s, e)
+    return tostring(tonumber(hex:sub(s, e), 16))
+end
+
+--------------------------------------------------------------------------------
+-- Colour Functions
+
+-- Reset the SGR Colour
+local function sgr_reset(onlyone, isbg)
+	if (onlyone) then
+		if (isbg) then
+			col_state.bg = false
+			return sgr_esc.."49m"
+		else
+			col_state.fg = false
+			return sgr_esc.."39m"
+		end
+	end
+	col_state.fg = false
+	col_state.bg = false
+	return sgr_esc.."0m"
+end
+
+-- Set a 4-bit (CGA) Colour
+local function sgr_set_low_4bit(col, isbg)
+	if (false == col) then return sgr_reset(true, isbg) end
+	if (("number" == type(col)) and
+		(((30 <= col) and (37 >= col)) or ((90 <= col) and (97 >= col)))) then
+		if (isbg) then
+			col_state.bg = col
+			return sgr_esc..(col + 10).."m"
+		else
+			col_state.fg = col
+			return sgr_esc..col.."m"
+		end
+	end
+	return ""
+end
+
+-- Set an 8-bit (VGA) Colour
+local function sgr_set_low_8bit(col, isbg)
+	if (false == col) then return sgr_reset(true, isbg) end
+	if (("number" == type(col)) and (0 <= col) and (255 >= col)) then
+		if (isbg) then
+			col_state.bg = col
+			return sgr_esc.."48;5;"..col.."m"
+		else
+			col_state.fg = col
+			return sgr_esc.."38;5;"..col.."m"
+		end
+	end
+	return ""
+end
+
+-- Set a 16-bit ("True") Colour
+local function sgr_set_low_16bit(col, isbg)
+	if (false == col) then return sgr_reset(true, isbg) end
+	if ("string" == type(col)) then
+		hex = string.gsub(col, "^#", "")
+		if (6 == string.len(hex)) then
+			if (isbg) then
+				col_state.bg = col
+				return sgr_esc.."48;2;"..hex2dec(hex, 1, 2)..";"..hex2dec(hex, 3, 4)..";"..hex2dec(hex, 5, 6).."m"
+			else
+				col_state.fg = col
+				return sgr_esc.."38;2;"..hex2dec(hex, 1, 2)..";"..hex2dec(hex, 3, 4)..";"..hex2dec(hex, 5, 6).."m"
+			end
+		end
+	end
+	return ""
+end	
+
+-- Set an SGR Colour (4, 8 or 16-bit)
+-- If Colour is false, Reset it to Default...
+-- If Colour is a Table, Use the Current Colour mode to Set the Colour
+-- If Colour is a String, Assume it is an RGB Hex String and Use 16-bit Colour to Set it
+-- If Colour is nil (or something else), Ignore It and Do Nothing...
+-- Use sgr_reset() to set both foreground and background to Default
+local function sgr_set_low(col, isbg)
+	if (false == col) then return sgr_reset(true, isbg) end
+	if ("table" == type(col)) then
+		if (17 == dw.colour_mode) then
+			return sgr_set_low_16bit(col[17], isbg)
+		elseif (16 == dw.colour_mode) then
+			return sgr_set_low_16bit(col[16], isbg)
+		elseif (8 == dw.colour_mode) then
+			return sgr_set_low_8bit(col[8], isbg)
+		elseif (4 == dw.colour_mode) then
+			return sgr_set_low_4bit(col[4], isbg)
+		end
+	end
+	if ("string" == type(col)) then return sgr_set_low_16bit(col, isbg) end
+	return ""
+end
+
+-- Set the SGR Colour for Both Foreground and Background at the Same Time
+local function sgr_set(fg, bg)
+	return sgr_set_low(fg, false)..sgr_set_low(bg, true)
+end
+
+-- Print Text with a Specific (Temporary) Foreground and Background Colour
+local function sgr_temp(fg, bg, txt)
+	local sgr_str = ""
+	local prev_fg = col_state.fg
+	local prev_bg = col_state.bg
+	return sgr_set(fg, bg)..txt..sgr_set(prev_fg, prev_bg)
+end
+
+--------------------------------------------------------------------------------
+-- Query Data
+
+-- Get our current Path
+local function get_cwd()
+	return os.getcwd()
+	-- This is Windows, by default, 'cd ~' doesn't work, so why bother...
+	-- return rl.collapsetilde(os.getcwd(), true)
+end
+
+-- Get our current Day / Time
+local function get_dts()
+	return os.date("%a, %I:%M%p", os.time())
+end
+
+-- Get our Name
+local function get_name()
+	return os.getenv("USERNAME") or "Luke"
+end
+
+-- Get our Computer Name
+local function get_host()
+	return os.getenv("COMPUTERNAME") or "WINDOWS"
+end
+
+-- Get our Battery Level / AC Power Indicator
+local function get_power(force_powerlevel)
+	local power = os.getbatterystatus()
+	if (force_powerlevel) then
+		power.level = force_powerlevel
+		power.acpower = false
+	end
+	-- If we are on AC Power
+	if ((power.acpower) or (100 < power.level)) then
+		-- return ""
+		return sgr_temp(power_list["AC"].fg, nil, ucs2to8(power_list["AC"].char))
+	end
+	-- Battery Level
+	if         ( 5 >= power.level) then return sgr_temp( power_list[5].fg, nil,  ucs2to8(power_list[5].char))
+		elseif (25 >= power.level) then return sgr_temp(power_list[25].fg, nil, ucs2to8(power_list[25].char))
+		elseif (37 >= power.level) then return sgr_temp(power_list[37].fg, nil, ucs2to8(power_list[37].char))
+		elseif (50 >= power.level) then return sgr_temp(power_list[50].fg, nil, ucs2to8(power_list[50].char))
+		elseif (62 >= power.level) then return sgr_temp(power_list[62].fg, nil, ucs2to8(power_list[62].char))
+		elseif (75 >= power.level) then return sgr_temp(power_list[75].fg, nil, ucs2to8(power_list[75].char))
+		elseif (87 >= power.level) then return sgr_temp(power_list[87].fg, nil, ucs2to8(power_list[87].char))
+		else return sgr_temp(power_list[100].fg, nil, ucs2to8(power_list[100].char))
+	end
+	return sgr_temp(power_list[5].fg, nil, ucs2to8(power_list[5].char))
+end
+
+-- Get our Drive Type Indicator
+local function get_drivetype(force_drvtype)
+	local drv_type = os.getdrivetype(string.sub(os.getcwd(), 1, 1)..":\\")
+	if (force_drvtype) then
+		drv_type = force_drvtype
+	end
+	if ("fixed" == drv_type) then return "" end
+	if (drive_list[drv_type]) then
+		return ucs2to8(drive_list[drv_type]).." "
+	end
+	return ucs2to8(drive_list["unknown"]).." "
+end
+
+-- Get our Greeting
+local function get_greeting()
+	t = os.date("*t")
+	if (17 <= t.hour) then
+		return "Good evening, "..get_name()..". Commands, assemble, and Shell Scripts, roll out!"
+	end
+	if (11 <= t.hour) then
+		return "Good afternoon, "..get_name()..". Please feed the CLI some commands.. coffee.. CTRL-ZZzzz.."
+	end
+	if (5 <= t.hour) then
+		return "Good morning, "..get_name()..". Early morning commands catches the bugs."
+	end
+	return "It's kinda late, "..get_name()..", but the CLI will be with you. Always. ^_^"
+end
+
+--------------------------------------------------------------------------------
+-- Configure Ourselves
+
+-- Set Colour/Display Theme
+local function set_theme(force_theme_name)
+	-- Choose our Theme
+	dw.theme_name = force_theme_name or os.getenv('DEEPWAVE_PROMPT_THEME') or def_theme_name
+	if (not theme_defns[dw.theme_name]) then
+		dw.theme_name = def_theme_name
+	end
+
+	-- Set the Theme
+	local theme = theme_defns[dw.theme_name]
+	dw.cwd_fg = theme.cwd_fg
+	dw.cwd_bg = theme.cwd_bg
+	dw.host_fg = theme.host_fg
+	dw.host_bg = theme.host_bg
+	dw.timestamp_fg = theme.timestamp_fg
+	dw.timestamp_muted_fg = col_line2.muted_fg
+
+	-- Set our Muted Colours
+	if (not dw.cwd_bg) then
+		dw.cwd_muted_fg = col_muted_nb.cwd_fg
+		dw.cwd_muted_bg = false
+		dw.host_muted_fg = col_muted_nb.host_fg
+		dw.host_muted_bg = false
+	else
+		dw.cwd_muted_fg = col_muted.cwd_fg
+		dw.cwd_muted_bg = col_muted.cwd_bg
+		dw.host_muted_fg = col_muted.host_fg
+		dw.host_muted_bg = col_muted.host_bg
+	end
+
+	-- Set our Error Colours
+	if (not dw.cwd_bg) then
+		dw.err_fg = col_error.bg
+		dw.err_bg = false
+	else
+		dw.err_fg = col_error.fg
+		dw.err_bg = col_error.bg
+	end
+end
+
+-- Configure Settings
+local function set_settings(force_default)
+	dw.enable_timestamp = def_enable_timestamp
+	dw.enable_hostname = def_enable_hostname
+	dw.enable_errorind = def_enable_errorind
+	dw.enable_batteryind = def_enable_batteryind
+	dw.enable_drvtypeind = def_enable_drvtypeind
+	dw.enable_muteold = def_enable_muteold
+	dw.enable_twoline = def_enable_twoline
+	dw.enable_greeting = def_enable_greeting
+	dw.colour_mode = def_colour_mode
+	if (not force_default) then
+		if (os.getenv('DEEPWAVE_PROMPT_DISABLE_HOSTNAME')) then
+			dw.enable_hostname = false
+		end
+		if (os.getenv('DEEPWAVE_PROMPT_DISABLE_TIMESTAMP')) then
+			dw.enable_timestamp = false
+		end
+		if (os.getenv('DEEPWAVE_PROMPT_DISABLE_ERRORIND')) then
+			dw.enable_errorind = false
+		end
+		if (os.getenv('DEEPWAVE_PROMPT_DISABLE_BATTERYIND')) then
+			dw.enable_batteryind = false
+		end
+		if (os.getenv('DEEPWAVE_PROMPT_DISABLE_DRVTYPEIND')) then
+			dw.enable_drvtypeind = false
+		end
+		if (os.getenv('DEEPWAVE_PROMPT_DISABLE_MUTEOLD')) then
+			dw.enable_muteold = false
+		end
+		if (os.getenv('DEEPWAVE_PROMPT_ENABLE_TWOLINE')) then
+			dw.enable_twoline = true
+		end
+		if (os.getenv('DEEPWAVE_PROMPT_DISABLE_GREETING')) then
+			dw.enable_greeting = false
+		end
+		if (col_modes[os.getenv('DEEPWAVE_PROMPT_COLOUR_MODE')]) then
+			dw.colour_mode = col_modes[os.getenv('DEEPWAVE_PROMPT_COLOUR_MODE')]
+		end
+	end
+	-- Overrides Based on Clink's Settings / Capabilities
+	if ("off" == settings.get("prompt.transient")) then
+		dw.enable_muteold = false
+		dw.enable_twoline = false
+	end
+	if (not settings.get("cmd.get_errorlevel")) then
+		dw.enable_errorind = false
+	end
+	set_theme(false)
+end
+
+--------------------------------------------------------------------------------
+-- Tools to Build Segments
+
+-- Build a Segment without a Background, with special consideration for _NOT_ displaying an ending separator
+-- Does _NOT_ pad the ending of the prompt
+local function build_segment_nobg(fg, txt, no_sep)
+	if ((not txt) or (1 > string.len(txt))) then return "" end
+	if (no_sep) then return sgr_temp(fg, false, txt) end
+	-- If we are including the separator, we need to pad the text before the separator
+	return sgr_temp(fg, false, txt.." "..ucs2to8(const_sep_nobg))
+end
+
+-- Build a Segment with a Background, with optional consideration for separators that change to the next background
+-- Does _NOT_ pad the ending of the prompt
+local function build_segment_wibg(fg, bg, txt, new_bg)
+	if ((not txt) or (1 > string.len(txt))) then return "" end
+	local str = { }
+	-- Especially for Backgrounds, we need some padding around the text, unless we want it to be very compact
+	table.insert(str, sgr_temp(fg, bg, " "..txt.." "))
+	if (new_bg) then
+		table.insert(str, sgr_temp(bg, new_bg, ucs2to8(const_sep_hvbg)))
+	else
+		table.insert(str, sgr_temp(bg, false, ucs2to8(const_sep_hvbg)))
+	end
+	return table.concat(str)
+end
+
+-- Build a Padding String, Given the Left and Right strings, so that the padding will push the right string to the end of the line
+-- Return false if the Left Side is Too Long to Show the Right Side
+local function build_segment_padding(left, right)
+	local left_len = console.cellcount(left)
+    local right_len = console.cellcount(right)
+	if (left_len + 4 + right_len) >= console.getwidth() then
+		return false
+	else
+		return string.rep(" ", console.getwidth() - (left_len + right_len))
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Build Segment Strings
+
+-- Build a Hostname Segment (usually for the Left Side Prompt)
+local function build_segment_hostname(istransient, ismuted, iserror)
+	local fg = dw.host_fg
+	local bg = dw.host_bg
+	local new_bg = dw.cwd_bg
+	if (istransient) then
+		-- If we were asked for a Muted Prompt, use a Muted Colour instead
+		if (ismuted) then
+			fg = dw.host_muted_fg
+			bg = dw.host_muted_bg
+			new_bg = dw.cwd_muted_bg
+		end
+	else
+		if (iserror) then
+			-- If we are _NOT_ Transient, and an Error is Indicated, then use an error colour instead
+			new_bg = dw.err_bg
+		end
+	end
+	if (not bg) then
+		-- Need to pad the Hostname before the CWD because _nobg() does not do so
+		return build_segment_nobg(fg, get_host(), false).." "
+	else
+		return build_segment_wibg(fg, bg, get_host(), new_bg)
+	end
+end
+
+-- Build a Path Segment (usually for the Left Side Prompt)
+local function build_segment_cwd(istransient, ismuted, iserror)
+	local fg = dw.cwd_fg
+	local bg = dw.cwd_bg
+	local str = { }
+	if (istransient) then
+		-- If we were asked for a Muted Prompt, use a Muted Colour instead
+		if (ismuted) then
+			bg = dw.cwd_muted_bg
+			fg = dw.cwd_muted_fg
+		end
+	else
+		if (iserror) then
+			-- If we are _NOT_ Transient, and an Error is Indicated, then use an error colour instead
+			fg = dw.err_fg
+			bg = dw.err_bg
+		end
+	end
+	if (dw.enable_drvtypeind) then table.insert(str, get_drivetype()) end
+	table.insert(str, get_cwd())
+	if (not bg) then
+		if (dw.enable_twoline) then
+			-- In a Two-line Prompt, Do Not End the CWD with a Separator, that's on the next line
+			return build_segment_nobg(fg, table.concat(str), true)
+		else
+			return build_segment_nobg(fg, table.concat(str), false)
+		end
+	else
+		return build_segment_wibg(fg, bg, table.concat(str), nil)
+	end
+end
+
+-- Build a Timestamp Segment (usually for the Right Side Prompt), Always with No Background
+local function build_segment_timestamp(istransient, ismuted)
+	local fg = dw.timestamp_fg
+	-- If we were asked for a Muted Prompt, use a Muted Colour instead
+	if (ismuted) then
+		fg = dw.timestamp_muted_fg
+	end
+	return build_segment_nobg(fg, get_dts(), true)
+end
+
+-- Build a Power Segment (usually for the Right Side Prompt), Always with No Background
+local function build_segment_power(istransient, ismuted)
+	if (istransient) then
+		-- We don't display the power indicator on transient prompts
+		return ""
+	else
+		-- get_power() already sets the colours accordingly
+		return get_power(nil)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Build Prompts
+
+-- Build the Left Side Prompt
+local function build_left(istransient, ismuted, iserror)
+	local str = { }
+	-- If we have to display the Computer Name Segment
+	if (dw.enable_hostname) then table.insert(str, build_segment_hostname(istransient, ismuted, iserror)) end
+	-- CWD Segment
+	table.insert(str, build_segment_cwd(istransient, ismuted, iserror))
+	-- In Two-Line Mode, the prompt is on the Next Line, but in One-Line Mode, we need to pad the prompt before user input
+	if (not dw.enable_twoline) then table.insert(str, " ") end
+	return table.concat(str)
+end
+
+-- Build the Right Side Prompt
+local function build_right(istransient, ismuted)
+	local str = { }
+	if (dw.enable_batteryind) then table.insert(str, build_segment_power(istransient)) end
+	if (dw.enable_timestamp) then table.insert(str, build_segment_timestamp(istransient, ismuted)) end
+	return table.concat(str, " ")
+end
+
+-- Build Both the Left and Right Side Prompt on a Single Line (Mostly for Two-Line Mode and Demo)
+local function build_left_and_right(istransient, ismuted, iserror, extra_txt)
+	local left = build_left(istransient, ismuted, iserror)
+	if ((extra_txt) and (0 < string.len(extra_txt))) then left = left..extra_txt end
+	local right = build_right(istransient, ismuted)
+	local padding = build_segment_padding(left, right)
+	if (not padding) then
+		-- Left Side is Too Long to Show the Right Side, so only return the Left
+		return left
+	else
+		return table.concat({left, padding, right})
+	end
+end
+
+-- Build Both the First and Second Lines of the Two-Line Mode
+local function build_two_line_mode(istransient, ismuted, iserror, extra_txt)
+	local line2_fg = col_line2.fg
+	local str = { }
+	-- If we were asked for a Muted Prompt, use a Muted Colour instead
+	if (muted) then
+		line2_fg = col_line2.muted_fg
+	end
+	if (not istransient) then
+		-- In a Two-line Prompt, We only show the first line if we are _NOT_ in a Transient Prompt (Old Prompt)
+		table.insert(str, build_left_and_right(false, false, iserror, nil))
+		table.insert(str, "\n")
+	end
+	-- 2nd Line Prompt
+	table.insert(str, sgr_temp(line2_fg, nil, ucs2to8(const_sep_nobg)))
+	table.insert(str, " ")
+	if ((extra_txt) and (0 < string.len(extra_txt))) then table.insert(str, extra_txt) end
+	return table.concat(str)
+end
+
+--------------------------------------------------------------------------------
+-- clinkprompt Filter Integration
+
+-- Main Prompt
+local dw_prompt = clink.promptfilter(5)
+
+-- Set the Prompt (Left)
+function dw_prompt:filter()
+	local iserror = false
+	if ((dw.enable_errorind) and (0 ~= os.geterrorlevel())) then
+		-- If error indicators are on and there is a real error, show the error indicator
+		iserror = true
+	end
+	-- Really Build the Left Prompt
+	if (dw.enable_twoline) then
+		return sgr_reset()..build_two_line_mode(false, false, iserror, nil)
+	else
+		return sgr_reset()..build_left(false, false, iserror)
+	end
+end
+
+-- Set the Prompt (Right)
+function dw_prompt:rightfilter()
+	if (dw.enable_twoline) then
+		-- In a Two-line Prompt, The Right Prompt is built as part of the Left Prompt
+		return nil
+	else
+		return sgr_reset()..build_right(false, false)
+	end
+end
+
+-- Set the (Muted) Transient Prompt (Left)
+function dw_prompt:transientfilter()
+	-- Really Build the Left Prompt
+	if (dw.enable_twoline) then
+		return sgr_reset()..build_two_line_mode(true, dw.enable_muteold, false, nil)
+	else
+		return sgr_reset()..build_left(true, dw.enable_muteold, false)
+	end
+end
+
+-- Set the (Muted) Transient Prompt (Right)
+function dw_prompt:transientrightfilter()
+	if (dw.enable_twoline) then
+		-- In a Two-line Prompt, we don't show the Old Right Prompts anymore
+		return nil
+	else
+		-- Prior to clink 1.7.4, there is a bug preventing the right transient prommpt from being displayed if it was exactly identical as the existing right prompt
+		-- We work around this by adding an extra sgr_reset() at the back of the string, so it is no longer exactly identical
+		return sgr_reset()..build_right(true, dw.enable_muteold)..sgr_reset()
+	end
+end
+
+--------------------------------------------------------------------------------
+-- clinkprompt Event Handlers
+
+-- Command Line Header
+local function onbeginedit()
+	set_settings(false)
+end
+
+-- Register our Event Handlers
+clink.onbeginedit(onbeginedit)
+
+--------------------------------------------------------------------------------
+-- clinkprompt Module Handlers
+
+-- Upon Prompt Show
+-- Prior to clink 1.7.4, the demo() function was not being executed, so a poor workaround was to execute demo() during ondeactivate()
+local function demo()
+	-- Current Settings
+	local cur_theme = dw.theme_name
+	print(sgr_reset())
+
+	print(sgr_temp(col_yellow, nil, "  ---- Current DeepWave clinkprompt Settings: ----"))
+	local str  = { }
+	table.insert(str, "  ")
+	table.insert(str, ucs2to8(const_sep_nobg).." Right Timestamp:  ")
+	if (dw.enable_timestamp) then table.insert(str, sgr_temp(col_green, nil, "Show    ")) else table.insert(str, sgr_temp(col_red, nil, "Hide    ")) end
+	table.insert(str, ucs2to8(const_sep_nobg).." Computer Name:    ")
+	if (dw.enable_hostname)  then table.insert(str, sgr_temp(col_green, nil, "Show    ")) else table.insert(str, sgr_temp(col_red, nil, "Hide    ")) end
+	table.insert(str, ucs2to8(const_sep_nobg).." Error Indicator:  ")
+	if (dw.enable_errorind)  then table.insert(str, sgr_temp(col_green, nil, "Show    ")) else table.insert(str, sgr_temp(col_red, nil, "Hide    ")) end
+	print(table.concat(str))
+
+	str  = { }
+	table.insert(str, "  ")
+	table.insert(str, ucs2to8(const_sep_nobg).." Mute Old Prompts: ")
+	if (dw.enable_muteold)   then table.insert(str, sgr_temp(col_green, nil, "Yes     ")) else table.insert(str, sgr_temp(col_red, nil, "No      ")) end
+	table.insert(str, ucs2to8(const_sep_nobg).." Two-Line Prompt:  ")
+	if (dw.enable_twoline)   then table.insert(str, sgr_temp(col_green, nil, "Yes     ")) else table.insert(str, sgr_temp(col_red, nil, "No      ")) end
+	table.insert(str, ucs2to8(const_sep_nobg).." Show Greeting:    ")
+	if (dw.enable_greeting)  then table.insert(str, sgr_temp(col_green, nil, "Yes ^_^ ")) else table.insert(str, sgr_temp(col_red, nil, "No ;_;  ")) end
+	print(table.concat(str))
+
+	str  = { }
+	table.insert(str, "  ")
+	table.insert(str, ucs2to8(const_sep_nobg).." USB / Network:    ")
+	table.insert(str, get_drivetype("removable")..get_drivetype("remote")..get_drivetype("unknown").."  ")
+	table.insert(str, ucs2to8(const_sep_nobg).." Battery / AC:     ")
+	table.insert(str, table.concat({get_power(5), get_power(25), get_power(37), get_power(50), get_power(62), get_power(75), get_power(87), get_power(100), get_power(101)}, " "))
+	print(table.concat(str))
+
+	if (settings.get("prompt.transient") == "off") then
+		print("  "..sgr_temp(col_brred, nil, "REMINDER: 'clink set prompt.transient always|same_dir' is required for Mute Old / Two-Line Prompts"))
+	end
+
+	-- Force Reset All Settings to Default so we don't follow Environment Variables for Demo
+	set_settings(true)
+
+	-- Themes
+	print("")
+	print(sgr_temp(col_yellow, nil, "  ---- Choosing Themes and Colours: ----"))
+	for k,v in ipairs({"blue", "magenta", "yellow", "mono", "blue_nb", "magenta_nb", "yellow_nb", "mono_nb"}) do
+		local cur_theme_str = ""
+		if (v == cur_theme) then cur_theme_str = sgr_temp(col_green, nil, "  -- Current Theme --") end
+		set_theme(v)
+		print(build_left_and_right(false, false, false, "set DEEPWAVE_PROMPT_THEME="..v..cur_theme_str))
+	end
+	set_theme("blue")
+
+	-- Settings
+	print("")
+	print(sgr_temp(col_yellow, nil, "  ---- Changing Settings (Using 'blue' Theme): ----"))
+	-- Mute Old Prompts
+	print(build_left_and_right(true, true, false, "Mute Old Prompts: set DEEPWAVE_PROMPT_DISABLE_MUTEOLD="))
+	-- Error Indicator
+	print(build_left_and_right(false, false, true, "Show Error Indicator: set DEEPWAVE_PROMPT_DISABLE_ERRORIND="))
+	-- Two-Line Mode
+	dw.enable_twoline = true
+	print(build_two_line_mode(false, false, false, "Enable Two-Line Prompt: set DEEPWAVE_PROMPT_ENABLE_TWOLINE=1"))
+	dw.enable_twoline = false
+	-- Hide Computer Name
+	dw.enable_hostname = false
+	print(build_left_and_right(false, false, false, "Hide Computer Name: set DEEPWAVE_PROMPT_DISABLE_HOSTNAME=1"))
+	dw.enable_hostname = true
+	-- Hide Timestamp
+	dw.enable_timestamp = false
+	print(build_left_and_right(false, false, false, "Hide Timestamp: set DEEPWAVE_PROMPT_DISABLE_TIMESTAMP=1"))
+	dw.enable_timestamp = true
+	-- Show Greeting
+	print("Greeting: "..sgr_temp(col_brcyan, nil, get_greeting()))
+
+	-- Overview
+	print("")
+	print(sgr_temp(col_brcyan, nil, "  "..MOD_NAME.." clinkprompt Module, Version: "..MOD_VER))
+	print("  For more information/updates, please visit "..MOD_URL)
+	print("  Use 'clink config prompt use "..MOD_NAME.."' to use this prompt.")
+	set_theme(def_theme_name)
+	dw.is_demo = true
+end
+
+-- Upon Module Activation - (eg. Clink Load Time, or this prompt is chosen/set)
+local function onactivate()
+	set_settings(false)
+	if (dw.enable_greeting) then
+		print(sgr_temp(col_brcyan, nil, get_greeting()))
+		print("")
+	end
+end
+
+-- Upon Module De-Activation - (eg. When a different prompt is chosen/set, or prompts is disabled)
+local function ondeactivate()
+	if (not dw.is_demo) then
+		print("")
+		print(sgr_temp(col_brcyan, nil, "  Thanks for using the "..MOD_NAME.." clinkprompt Module, "..get_name().."!"))
+		print("")
+		print(sgr_temp(col_brcyan, nil, "  Remember, the CLI will be with you. Always. ^_^"))
+	end
+end
+
+-- Register our Module Handlers
+local exports = {
+	demo = demo,
+	onactivate = onactivate,
+	ondeactivate = ondeactivate,
+}
+return exports
